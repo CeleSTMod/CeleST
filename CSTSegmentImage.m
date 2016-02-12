@@ -10,8 +10,6 @@ function [fileDBEntry,listOfWormsEntry] = CSTSegmentImage(fileDBEntry, currentIm
 % -------------------
 global currentImage zoneOkForCompleteWorms zoneOkForStartingWorms traceOn timingOn timings timingsTime plotAllOn flagRobustness fileToLog flagVIP;
 
-plotAllOn = true;
-
 if timingOn; tic; end
 if traceOn; fprintf(fileToLog, ['processing frame ', num2str(currentFrameForProcessing), ' from ', fileDBEntry.name,' : ', currentImageFileName, '\n']); end
 
