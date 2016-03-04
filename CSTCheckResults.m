@@ -1405,7 +1405,7 @@ waitfor(mainFigure,'BeingDeleted','on');
                         longueurs = arrayfun(@(c) length(c.name),imageFiles);
                         if min(longueurs) < max(longueurs)
                             nbOfElementsTmp = length(imageFiles);
-                            listOfNamesTmp = cell(1,nbOfElementsTmp); listOfWorms.outOfLengths
+                            listOfNamesTmp = cell(1,nbOfElementsTmp);
                             for n = 1:nbOfElementsTmp
                                 listOfNamesTmp{n} = imageFiles(n).name;
                             end
