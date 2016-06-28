@@ -7,7 +7,7 @@ function CSTProcessVideos
 
 % This function creates a window displaying sequences (frame by frame), where the user can launch the processing per sequence, and manually draw and edit the segmented worms.
 
-global filenames fileDB filterNames filterSelection flagRobustness fileToLog currentImage timingOn timings timingsLabel timingsTime zoneOkForCompleteWorms zoneOkForStartingWorms listOfWorms traceOn colFtlWell mainPnlW mainPnlH;
+global segFigs filenames fileDB filterNames filterSelection flagRobustness fileToLog currentImage timingOn timings timingsLabel timingsTime zoneOkForCompleteWorms zoneOkForStartingWorms listOfWorms traceOn colFtlWell mainPnlW mainPnlH;
 
 % ============
 % CREATE THE INTERFACE
@@ -183,6 +183,7 @@ waitfor(mainFigure,'BeingDeleted','on');
         end
         % ...............
         currentImage = double(imread( fullfile( fileDB(videoBeingProcessed).directory, imageFiles(currentFrameForProcessing).name) ));
+        currentImage = currentImage(:,:,1);
         if timingOn; timings(1) = timings(1) + toc ; timingsTime(1) = timingsTime(1) + 1 ; tic; end
         [imHeight, imWidth] = size(currentImage);
         if timingOn; tic; end
@@ -255,12 +256,16 @@ waitfor(mainFigure,'BeingDeleted','on');
             set(txtProcFrame, 'string', ['Frames processed: ', num2str(currentFrameForProcessing), ' / ', num2str(totalFrames)]);
             if timingOn; tic; end
             currentImage = double(imread( fullfile( fileDB(videoBeingProcessed).directory, imageFiles(currentFrameForProcessing).name) ));
+            currentImage = currentImage(:,:,1);
             if timingOn; timings(1) = timings(1) + toc ; timingsTime(1) = timingsTime(1) + 1 ; tic; end
             try
                 if floor(iter/stepImagesAuto) == iter/stepImagesAuto
+                    disp(['Processing Frame: ' num2str(currentFrameForProcessing)]);
                     [fileDBEntry,listOfWormsEntry] = CSTSegmentImage(fileDB(videoBeingProcessed), imageFiles(currentFrameForProcessing).name, currentFrameForProcessing, axesImage);
                     CSTTrackWorms(fileDB(videoBeingProcessed), imageFiles(currentFrameForProcessing).name, currentFrameForProcessing, axesImage);
+                    disp(['Before Merge: ' num2str(length(listOfWorms.skel))]);
                     CSTMergeSegmAndTrack(fileDBEntry, listOfWormsEntry, imageFiles(currentFrameForProcessing).name, currentFrameForProcessing, axesImage, nbOfFrames);
+                    disp(['After Merge: ' num2str(length(listOfWorms.skel))]);
                 else
                     CSTTrackWorms(fileDB(videoBeingProcessed), imageFiles(currentFrameForProcessing).name, currentFrameForProcessing, axesImage);
                 end
@@ -273,6 +278,19 @@ waitfor(mainFigure,'BeingDeleted','on');
                 end
             end
         end
+        
+        for wormToCheck = length(listOfWorms.skel):-1:1
+            if any(cellfun(@isempty, listOfWorms.skel{wormToCheck}))
+                listOfWorms.missed(wormToCheck,:) = [];
+                listOfWorms.overlapped(wormToCheck,:) = [];
+                listOfWorms.lost(wormToCheck,:) = [];
+                listOfWorms.skel(wormToCheck) = [];
+                listOfWorms.width(wormToCheck) = [];
+                listOfWorms.localthreshold(wormToCheck) = [];
+                listOfWorms.lengthWorms(wormToCheck,:) = [];
+            end
+        end
+        
         fileDB(videoBeingProcessed).worms = length(listOfWorms.skel);
         fileDB(videoBeingProcessed).segmented = true;
         try
@@ -295,10 +313,12 @@ waitfor(mainFigure,'BeingDeleted','on');
         for tt = 1:length(timingsLabel)
             disp([timingsLabel{tt}, ' : ' , num2str(timings(tt)) , ' / ' , num2str( timingsTime(tt))]);
         end
+        toc
     end
 
 
     function launchProcessing(hObject,eventdata)
+        tic
         flagFinishedProcessing = false;
         if ~isempty(listVideosToProcIdx)
             set(btnProcessInterrupt, 'enable', 'on')
@@ -329,6 +349,7 @@ waitfor(mainFigure,'BeingDeleted','on');
             end
             try
                 for currentVideoIdx = 1:length(listVideosToProcIdx)
+                    tvideo = tic;
                     omega=[];
                     videoBeingProcessed = listVideosToProcIdx(currentVideoIdx);
                     set(txtProcTotal, 'string' , ['Videos processed: ',num2str(currentVideoIdx),' / ', num2str(length(listVideosToProcIdx))]);
@@ -375,7 +396,8 @@ waitfor(mainFigure,'BeingDeleted','on');
                     if(fileDB(listVideosToProcIdx(currentVideoIdx)).measured)
                             delete(fullfile(filenames.measures, ['wormMeas_',fileDB(listVideosToProcIdx(currentVideoIdx)).name,'.txt']));
                             fileDB(listVideosToProcIdx(seg)).measured = 0;
-                    end  
+                    end
+                    toc(tvideo)
                 end
             catch em
                 if flagRobustness

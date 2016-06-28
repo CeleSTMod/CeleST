@@ -1097,7 +1097,7 @@ waitfor(mainFigure,'BeingDeleted','on');
             end
             computeBlockSeparatorsAndValidity
             selectWorm
-            CSTwriteSegmentationToTXT(listOfWorms, fileDB(currentVideo).name);
+%             CSTwriteSegmentationToTXT(listOfWorms, fileDB(currentVideo).name);
         catch exception
             generateReport(exception)
         end
