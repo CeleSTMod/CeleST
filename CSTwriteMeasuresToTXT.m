@@ -23,7 +23,7 @@ if fid >= 3
     fprintf(fid,['fields ', num2str(nbOfFields),'\n']);
     fprintf(fid,['worms ', num2str(nbOfWorms),'\n']);
     
-    for ff = 1:nbOfFields-1
+    for ff = 1:nbOfFields
         field = listOfFields{ff};
         fprintf(fid,[field,'\n']);
         if strcmp(field, 'status')

@@ -37,7 +37,7 @@ templateDist = realsqrt(repmat((-templateDistLength:templateDistLength).^2,2*tem
 % ===========
 try
     currentImage = double(imread( fullfile( fileDBEntry.directory, currentImageFileName) ));
-    currentImage = currentImage(:,:,1);
+    currentImage = imresize(currentImage(:,:,1), fileDBEntry.scaleFactor);
     segFigs.startingImage = currentImage;
     imHeight = size(currentImage,1);
     imWidth = size(currentImage,2);
@@ -66,9 +66,9 @@ else
     if ischar(fileDBEntry.well)
         fileDBEntry.well = str2num(fileDBEntry.well); %#ok<*ST2NM>
     end
-    maxX = fileDBEntry.well(1);
-    maxY = fileDBEntry.well(2);
-    newRayon = fileDBEntry.well(3);
+    maxX = fileDBEntry.well(1) * fileDBEntry.scaleFactor;
+    maxY = fileDBEntry.well(2) * fileDBEntry.scaleFactor;
+    newRayon = fileDBEntry.well(3) * fileDBEntry.scaleFactor;
 end
 
 % -----------
@@ -643,7 +643,7 @@ for currentWorm = 1:length(flagsFilteredToKeep)
             listOfWormsEntry.localthreshold{newWormIdx} = listOfWormsFiltered.localthreshold{currentWorm};
             listOfWormsEntry.lengthWorms(newWormIdx) = sum(hypot(listOfWormsEntry.skel{newWormIdx}(1,2:end)-listOfWormsEntry.skel{newWormIdx}(1,1:end-1),...
                 listOfWormsEntry.skel{newWormIdx}(2,2:end)-listOfWormsEntry.skel{newWormIdx}(2,1:end-1)));
-%             plot(listOfWormsEntry.skel{newWormIdx}(1,:), listOfWormsEntry.skel{newWormIdx}(2,:));
+            %             plot(listOfWormsEntry.skel{newWormIdx}(1,:), listOfWormsEntry.skel{newWormIdx}(2,:));
         end
     catch em
         if flagRobustness

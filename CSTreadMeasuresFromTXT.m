@@ -45,6 +45,9 @@ if fid >= 3
     
     for ff = 1:nbOfFields
         field = fgetl(fid);
+        if field == -1
+            break
+        end
         if strcmp(field, 'status')
             % always store status anyway
             listOfMeasures.(field) = cell(1,nbOfWorms);
@@ -79,7 +82,8 @@ if fid >= 3
                     end
                 end
             else
-                listOfMeasures.(field) = sscanf(fgetl(fid), '%f ');
+                line = fgetl(fid);
+                listOfMeasures.(field) = sscanf(line, '%f ');
                 if ~flagLoadAllWorms
                     listOfMeasures.(field) = listOfMeasures.(field)(listOfWormsToLoad);
                 end

@@ -186,139 +186,139 @@ waitfor(mainFigure,'BeingDeleted','on');
 % =========
     function exportAll(hObject,eventdata)
         try
-            try
-                defaultName = fullfile(filenames.export,['worm_data_',date,'.csv']);
-                flagUserInput = true;
-                if flagUserInput
-                    [csvFile,csvPath] = uiputfile('*.csv','Save to CSV file', defaultName);
-                    if ~csvPath % user pressed cancel
-                        return
-                    end
-                    fileToWrite = fopen(fullfile(csvPath,csvFile),'a');
-                else
-                    fileToWrite = fopen(defaultName,'a'); %#ok<UNRCH>
+            % Export graphics or CSVs
+            
+            % Export CSVs
+            defaultName = fullfile(filenames.export,['worm_data_',date,'.csv']);
+            flagUserInput = true;
+            if flagUserInput
+                [csvFile,csvPath] = uiputfile('*.csv','Save to CSV file', defaultName);
+                if ~csvPath % user pressed cancel
+                    return
                 end
-                prevSelection = samplesListSelection;
-                prevStat = statSelected;
-                samplesListSelection(:) = 1;
-                for statSelected = 1:nbOfMeasures %#ok<FXUP>
-                    showMeasures
+                fileToWrite = fopen(fullfile(csvPath,csvFile),'a');
+            else
+                fileToWrite = fopen(defaultName,'a'); %#ok<UNRCH>
+            end
+            prevSelection = samplesListSelection;
+            prevStat = statSelected;
+            samplesListSelection(:) = 1;
+            for statSelected = 1:nbOfMeasures %#ok<FXUP>
+                showMeasures
+            end
+            output = ['Videos selected', sprintf('\n')];
+            % List the samples and their contents
+            for samp = 1:nbOfSamples
+                output = [output, samplesDef{1,samp}]; %#ok<*AGROW>
+                nbOfVideos = length(samplesIdx{samp});
+                for vid = 1:nbOfVideos+1
+                    output = [output, ' , ', samplesDef{vid+1,samp}];
                 end
-                output = ['Videos selected', sprintf('\n')];
-                % List the samples and their contents
+                output = [output, sprintf('\n')];
+            end
+            
+            output = [output, sprintf(',\n\n\n'), 'Statistics , number of data points, mean , standard error of the mean , 95%% confidence interval around the mean , standard deviation , minimum value , first quartile , median , third quartile , maximum value', sprintf('\n\n')];
+            % For each measure, list the samples, the videos and the stats
+            wait = waitbar(0, 'Please wait...');
+            for idx = 1:nbOfMeasures
+                waitbar(idx / (3*nbOfMeasures))
+                output = [output, sprintf(',\n'), listOfButtons{idx}, sprintf('\n')];
                 for samp = 1:nbOfSamples
-                    output = [output, samplesDef{1,samp}]; %#ok<*AGROW>
+                    output = [output, samplesDef{1,samp}];
+                    output = [output, ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).nbDataPoints{samp}) , ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).mean{samp}) , ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).sem{samp}) , ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).cimean{samp}) , ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).std{samp}) , ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).min{samp}) , ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).quart1{samp}) , ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).median{samp}) , ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).quart3{samp}) , ...
+                        ' , ', sprintf('%f', measures.(listOfMeasures{idx}).max{samp}) ...
+                        ];
+                    output = [output, sprintf('\n')];
+                end
+            end
+            nbOfMeasures = length(listOfMeasures);
+            nbOfSamples = length(samplesIdx);
+            tableData = cell(2+(nbOfMeasures+1)*(nbOfSamples-1)-2, 1+4*(nbOfSamples-1));
+            tableData{1,1} = 'p values';
+            for head = 2:nbOfSamples
+                tableData{1,4*(head-1)-1} = samplesDef{1,head};
+            end
+            for meas = 2:nbOfMeasures
+                waitbar((nbOfMeasures+meas) / (3*nbOfMeasures))
+                rawData = cell(1,nbOfSamples);
+                for samp = 1:nbOfSamples
+                    rawData{samp} = [];
+                    for vid = 1:length(measures.(listOfMeasures{meas}).raw{samp})
+                        rawData{samp} = [rawData{samp} ; measures.(listOfMeasures{meas}).raw{samp}{vid}];
+                    end
+                end
+                for samp1 = 1:nbOfSamples-1
+                    tableData{2+(nbOfMeasures+1)*(samp1-1), 1} = samplesDef{1,samp1};
+                    tableData{2+(nbOfMeasures+1)*(samp1-1)+meas-1, 2} = listOfButtons{meas};
+                    for samp2 = (1+samp1):nbOfSamples
+                        if (size(rawData{samp1},1)==size(rawData{samp1},2))
+                            msgbox(['Stat tests could not be run for measure: ' listOfMeasures{meas} 'because data was non-commensurate for: ' samplesDef{3,samp1} '\nContinuing...'])
+                        elseif(size(rawData{samp2},1)==size(rawData{samp2},2))
+                            msgbox(['Stat tests could not be run for measure: ' listOfMeasures{meas} 'because data was non-commensurate for: ' samplesDef{3,samp2} '\nContinuing...'])
+                        else
+                            
+                            tableData{2+(nbOfMeasures+1)*(samp1-1) , 3+4*(samp2-2)} = 'F test';
+                            [~,pFtest] = vartest2(rawData{samp1},rawData{samp2},0.05, 'both');
+                            tableData{2+(nbOfMeasures+1)*(samp1-1)+(meas-1) , 3+4*(samp2-2)} = sprintf('%.4f',pFtest);
+                            
+                            tableData{2+(nbOfMeasures+1)*(samp1-1) , 3+4*(samp2-2)+1} = 't test equal';
+                            [~,pEqual] = ttest2(rawData{samp1},rawData{samp2},0.05, 'both','equal');
+                            tableData{2+(nbOfMeasures+1)*(samp1-1)+(meas-1) , 3+4*(samp2-2)+1} = sprintf('%.4f',pEqual);
+                            
+                            tableData{2+(nbOfMeasures+1)*(samp1-1) , 3+4*(samp2-2)+2} = 't test diff.';
+                            [~,pDiff] = ttest2(rawData{samp1},rawData{samp2},0.05, 'both','unequal');
+                            tableData{2+(nbOfMeasures+1)*(samp1-1)+(meas-1) , 3+4*(samp2-2)+2} = sprintf('%.4f',pDiff);
+                            
+                        end
+                    end
+                end
+            end
+            output = [output, sprintf('\n\n\n')];
+            for tmpRow = 1:size(tableData,1)
+                for tmpCol = 1:size(tableData,2)
+                    output = [output,tableData{tmpRow,tmpCol}, ' , '];
+                end
+                output = [output, sprintf('\n')];
+            end
+            
+            output = [output, sprintf(',\n\n\n\n'), 'Data points', sprintf('\n\n\n')];
+            % For each measure, list the samples, the videos and the values
+            for idx = 1:nbOfMeasures
+                waitbar((2*nbOfMeasures+idx) / (3*nbOfMeasures))
+                output = [output, listOfButtons{idx}, sprintf('\n')];
+                for samp = 1:nbOfSamples
+                    output = [output, samplesDef{1,samp}];
                     nbOfVideos = length(samplesIdx{samp});
-                    for vid = 1:nbOfVideos+1
-                        output = [output, ' , ', samplesDef{vid+1,samp}];
+                    for vid = 1:nbOfVideos
+                        newData = sprintf(', %f', measures.(listOfMeasures{idx}).raw{samp}{vid});
+                        output = [output, newData(~isnan(newData))];
                     end
                     output = [output, sprintf('\n')];
-                end
-                
-                output = [output, sprintf(',\n\n\n'), 'Statistics , number of data points, mean , standard error of the mean , 95%% confidence interval around the mean , standard deviation , minimum value , first quartile , median , third quartile , maximum value', sprintf('\n\n')];
-                % For each measure, list the samples, the videos and the stats
-                wait = waitbar(0, 'Please wait...');
-                for idx = 1:nbOfMeasures
-                    waitbar(idx / (3*nbOfMeasures))
-                    output = [output, sprintf(',\n'), listOfButtons{idx}, sprintf('\n')];
-                    for samp = 1:nbOfSamples
-                        output = [output, samplesDef{1,samp}];
-                        output = [output, ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).nbDataPoints{samp}) , ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).mean{samp}) , ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).sem{samp}) , ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).cimean{samp}) , ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).std{samp}) , ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).min{samp}) , ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).quart1{samp}) , ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).median{samp}) , ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).quart3{samp}) , ...
-                            ' , ', sprintf('%f', measures.(listOfMeasures{idx}).max{samp}) ...
-                            ];
-                        output = [output, sprintf('\n')];
-                    end
-                end
-                nbOfMeasures = length(listOfMeasures);
-                nbOfSamples = length(samplesIdx);
-                tableData = cell(2+(nbOfMeasures+1)*(nbOfSamples-1)-2, 1+4*(nbOfSamples-1));
-                tableData{1,1} = 'p values';
-                for head = 2:nbOfSamples
-                    tableData{1,4*(head-1)-1} = samplesDef{1,head};
-                end
-                for meas = 2:nbOfMeasures
-                    waitbar((nbOfMeasures+meas) / (3*nbOfMeasures))
-                    rawData = cell(1,nbOfSamples);
-                    for samp = 1:nbOfSamples
-                        rawData{samp} = [];
-                        for vid = 1:length(measures.(listOfMeasures{meas}).raw{samp})
-                            rawData{samp} = [rawData{samp} ; measures.(listOfMeasures{meas}).raw{samp}{vid}];
-                        end
-                    end
-                    for samp1 = 1:nbOfSamples-1
-                        tableData{2+(nbOfMeasures+1)*(samp1-1), 1} = samplesDef{1,samp1};
-                        tableData{2+(nbOfMeasures+1)*(samp1-1)+meas-1, 2} = listOfButtons{meas};
-                        for samp2 = (1+samp1):nbOfSamples
-                            if (size(rawData{samp1},1)==size(rawData{samp1},2))
-                                msgbox(['Stat tests could not be run for measure: ' listOfMeasures{meas} 'because data was non-commensurate for: ' samplesDef{3,samp1} '\nContinuing...'])
-                            elseif(size(rawData{samp2},1)==size(rawData{samp2},2))
-                                msgbox(['Stat tests could not be run for measure: ' listOfMeasures{meas} 'because data was non-commensurate for: ' samplesDef{3,samp2} '\nContinuing...'])
-                            else
-                                
-                                tableData{2+(nbOfMeasures+1)*(samp1-1) , 3+4*(samp2-2)} = 'F test';
-                                [~,pFtest] = vartest2(rawData{samp1},rawData{samp2},0.05, 'both');
-                                tableData{2+(nbOfMeasures+1)*(samp1-1)+(meas-1) , 3+4*(samp2-2)} = sprintf('%.4f',pFtest);
-                                
-                                tableData{2+(nbOfMeasures+1)*(samp1-1) , 3+4*(samp2-2)+1} = 't test equal';
-                                [~,pEqual] = ttest2(rawData{samp1},rawData{samp2},0.05, 'both','equal');
-                                tableData{2+(nbOfMeasures+1)*(samp1-1)+(meas-1) , 3+4*(samp2-2)+1} = sprintf('%.4f',pEqual);
-                                
-                                tableData{2+(nbOfMeasures+1)*(samp1-1) , 3+4*(samp2-2)+2} = 't test diff.';
-                                [~,pDiff] = ttest2(rawData{samp1},rawData{samp2},0.05, 'both','unequal');
-                                tableData{2+(nbOfMeasures+1)*(samp1-1)+(meas-1) , 3+4*(samp2-2)+2} = sprintf('%.4f',pDiff);
-                                
-                            end
-                        end
-                    end
-                end
-                output = [output, sprintf('\n\n\n')];
-                for tmpRow = 1:size(tableData,1)
-                    for tmpCol = 1:size(tableData,2)
-                        output = [output,tableData{tmpRow,tmpCol}, ' , '];
-                    end
-                    output = [output, sprintf('\n')];
-                end
-                
-                output = [output, sprintf(',\n\n\n\n'), 'Data points', sprintf('\n\n\n')];
-                % For each measure, list the samples, the videos and the values
-                for idx = 1:nbOfMeasures
-                    waitbar((2*nbOfMeasures+idx) / (3*nbOfMeasures))
-                    output = [output, listOfButtons{idx}, sprintf('\n')];
-                    for samp = 1:nbOfSamples
-                        output = [output, samplesDef{1,samp}];
-                        nbOfVideos = length(samplesIdx{samp});
-                        for vid = 1:nbOfVideos
-                            newData = sprintf(', %f', measures.(listOfMeasures{idx}).raw{samp}{vid});
-                            output = [output, newData(~isnan(newData))];
-                        end
-                        output = [output, sprintf('\n')];
-                    end
-                end
-                
-                fprintf(fileToWrite,output);
-                fclose(fileToWrite);
-                close(wait);
-                samplesListSelection = prevSelection;
-                statSelected = prevStat;
-            catch em
-                if flagRobustness
-                    fprintf(fileToLog, '***   There was an error writing export file \n');
-                    fprintf(fileToLog, [getReport(em, 'basic'),'\n']);
-                else
-                    rethrow(em)
                 end
             end
             
+            fprintf(fileToWrite,output);
+            fclose(fileToWrite);
+            close(wait);
+            samplesListSelection = prevSelection;
+            statSelected = prevStat;
+            
         catch exception
+            if flagRobustness
+                fprintf(fileToLog, '***   There was an error writing export file \n');
+                fprintf(fileToLog, [getReport(em, 'basic'),'\n']);
+            else
+                rethrow(em)
+            end
             generateReport(exception)
         end
     end

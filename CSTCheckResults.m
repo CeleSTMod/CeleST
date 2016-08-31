@@ -6,11 +6,12 @@ function CSTCheckResults(videoIdxToLoad, wormIdxToLoad)
 % THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-global filenames fileDB colFtlWell mainPnlW mainPnlH filterNames filterSelection listOfWorms;
+global filenames fileDB colFtlWell mainPnlW mainPnlH filterNames filterSelection listOfWorms flagSaveAllMeasures;
 
 thresholdDistPixel = 4;
 flagShowCurvaturePlots = false;
 flagPlotCurvOnly = false;
+flagSaveAllMeasures = true;
 totalWormsChecked = 0;
 allMeasures = struct();
 tmpDraw = [];
@@ -319,7 +320,7 @@ waitfor(mainFigure,'BeingDeleted','on');
                     listOfWorms.width{currentWorm}{ff} = listOfWorms.width{currentWorm}{ff}(end:-1:1);
                 end
                 selectWorm;
-                CSTwriteSegmentationToTXT(listOfWorms, fileDB(currentVideo).name);
+                CSTwriteSegmentationToTXT(listOfWorms, fileDB(currentVideo).name, true, 2, 0);
             else
                 warndlg('Please select a video','No Video Selected');
             end
@@ -383,6 +384,7 @@ waitfor(mainFigure,'BeingDeleted','on');
             end
             allMeasures.('Curling_All') = NaN(nbOfWorms, nbOfFrames);
             allMeasures.usability = NaN(1,nbOfWorms);
+            allMeasures.curvature = cell(1, nbOfWorms);
             oldNames = {'status', 'highThr', 'lowThr', 'prevThr', 'highThrDef', 'lowThrDef', 'prevThrDef', 'usability', 'manualSeparators', 'separators'};
             for oldIdx = 1:length(oldNames)
                 if strcmp(oldNames{oldIdx}, 'status')
@@ -409,6 +411,7 @@ waitfor(mainFigure,'BeingDeleted','on');
                 flagSmoothCurvature = true;
                 flagSuperSampleCurvature = true;
                 [ temporalFreq , spatialFreq , dynamicAmplitude , curvature ] = CSTComputeMeasuresFromBody(listOfWorms.skel{wormToMeasure}, flagSmoothCurvature, flagSuperSampleCurvature, listOfWorms.valid(wormToMeasure,:));
+                allMeasures.curvature{wormToMeasure} = curvature;
                 rangeUsable = ~isnan(temporalFreq);
                 if isempty(rangeUsable)
                     return
@@ -465,7 +468,7 @@ waitfor(mainFigure,'BeingDeleted','on');
                         allMeasures.('Curling_All')(wormToMeasure, ff) = min(minDistHead, minDistTail);
                     end
                 end
-                allMeasures.('Curling')(wormToMeasure) = sum( allMeasures.('Curling_All')(wormToMeasure, :) <= thresholdDistPixel ) / usableFrames * 60; % in seconds(of curling) per minute(of swimming)
+                allMeasures.('Curling')(wormToMeasure) = sum( allMeasures.('Curling_All')(wormToMeasure, :) <= thresholdDistPixel*fileDB(currentVideo).scaleFactor ) / usableFrames * 60; % in seconds(of curling) per minute(of swimming)
                 %-----------------
                 % Stretch
                 %-----------------
@@ -632,14 +635,29 @@ waitfor(mainFigure,'BeingDeleted','on');
                 finalNamesAllValues = {'Wave_Initiation_Rate_All', 'Body_Wave_Number_All', 'Asymmetry_All', ...
                     'Curling_All', 'Stretch_All', 'Traveling_Speed_All', 'Brush_Stroke_All', 'Activity_Index_All'...
                     };
+                allMeasuresFID = fopen( fullfile( filenames.measures, ['wormMeas_', fileDB(currentVideo).name, '_allMeasures.txt'] ), 'w+');
                 for measureIdx = 1:length(finalNamesAllValues)
+                    if flagSaveAllMeasures
+                        fprintf(allMeasuresFID, '%s \n', finalNamesAllValues{measureIdx});
+                        [allMeasuresWorms, allMeasuresFrames] = size(allMeasures.(finalNamesAllValues{measureIdx}));
+                        for wwAM = 1:allMeasuresWorms
+                            for ffAM = 1:allMeasuresFrames
+                                fprintf(allMeasuresFID, sprintf('%f ',allMeasures.(finalNamesAllValues{measureIdx})(wwAM,ffAM)));
+                            end
+                            fprintf(allMeasuresFID, '\n');
+                        end
+                    end
                     allMeasures = rmfield(allMeasures, finalNamesAllValues{measureIdx});
                 end
+                fclose(allMeasuresFID);
             end
             pause(0.001);
             if currentVideo~=0
                 if isgraphics(hTmp); waitbar(wormToMeasure/nbOfWorms,hTmp,'Writing Data...'); end
-                CSTwriteSegmentationToTXT(listOfWorms, fileDB(currentVideo).name)
+                tmpCurv = allMeasures.curvature;
+                save( fullfile( filenames.curvature, ['wormCurv_' fileDB(currentVideo).name] ), 'tmpCurv');
+                allMeasures = rmfield(allMeasures, 'curvature');
+                CSTwriteSegmentationToTXT(listOfWorms, fileDB(currentVideo).name, true, 2, 1);
                 CSTwriteMeasuresToTXT(allMeasures, fileDB(currentVideo).name, true, listOfWorms.status);
                 fileDB(currentVideo).measured = true;
                 fileDB(currentVideo).worms = totWorms;
@@ -1223,7 +1241,7 @@ waitfor(mainFigure,'BeingDeleted','on');
                 end
             end
             set(editCurrentFrame, 'string', int2str(currentFrame));
-            currentImage = imread( fullfile( fileDB(currentVideo).directory, imageFiles(currentFrame).name) );
+            currentImage = imresize( imread( fullfile( fileDB(currentVideo).directory, imageFiles(currentFrame).name) ), fileDB(currentVideo).scaleFactor);
             displayCurrentFrame
         catch exception
             generateReport(exception)
@@ -1389,7 +1407,7 @@ waitfor(mainFigure,'BeingDeleted','on');
                     % ------------
                     % Load the segmentation results
                     % ------------
-                    listOfWorms = CSTreadSegmentationFromTXT(fileDB(currentVideo).name);
+                    listOfWorms = CSTreadSegmentationFromTXT(fileDB(currentVideo).name, true, fileDB(currentVideo).measured);
                     nbOfWorms = length(listOfWorms.skel);
                     
                     % ------------
@@ -1422,7 +1440,7 @@ waitfor(mainFigure,'BeingDeleted','on');
                     currentFrame = 1;
                     set(editCurrentFrame, 'string', int2str(currentFrame));
                     try
-                        currentImage = imread( fullfile( fileDB(currentVideo).directory, imageFiles(currentFrame).name) );
+                        currentImage = imresize( imread( fullfile( fileDB(currentVideo).directory, imageFiles(currentFrame).name) ), fileDB(currentVideo).scaleFactor);
                     catch %#ok<CTCH>
                         currentImage = zeros(500);
                     end

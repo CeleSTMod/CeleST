@@ -1,4 +1,4 @@
-function listOfWorms = CSTreadSegmentationFromTXT(videoName, flagShowGUI)
+function listOfWorms = CSTreadSegmentationFromTXT(videoName, flagShowGUI, measured)
 
 % Copyright (c) 2013 Rutgers
 % Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -7,10 +7,14 @@ function listOfWorms = CSTreadSegmentationFromTXT(videoName, flagShowGUI)
 
 % Read segmentation results from txt file, returns a struct array with all the fields
 
-global filenames CeleSTVersion; % CeleSTVersion is for implementation of data consistency check
+global filenames; % CeleSTVersion is for implementation of data consistency check
 
 if nargin < 2
     flagShowGUI = true;
+end
+
+if nargin < 3
+    measured = false;
 end
 
 if flagShowGUI
@@ -21,6 +25,7 @@ fid = fopen(fullfile(filenames.segmentation, ['wormSegm_',videoName,'.txt']));
 line1 = textscan(fgetl(fid), '%s %s');
 
  if strcmp(line1{1}{1}, 'version')
+     Cver = line1{2}{1};
      line1 = textscan(fgetl(fid), '%s %s');
  end
 
@@ -36,12 +41,13 @@ listBoolean = {'missed', 'lost', 'overlapped'};
 listCell = {'skel', 'width'};
 listCellSingle = {'localthreshold', 'status'};
 listDouble = {'lengthWorms'};
-% if flagDataOutOfDate
-%     listBoolean = [listBoolean, 'valid', 'outOfLengths', 'outOfPrevious', 'inGlareZone', 'selfOverlap', 'manualInvalid', 'manualValid'];
-%     listCell = [listCell, 'cblSubSampled'];
-%     listDouble = [listDouble, 'positionCenterX', 'positionCenterY', 'widthCenter', 'overlapPrev', 'headThrashCount'];
-%     % Removed deprecated fields from listDouble: 'angleHead', 'angleTail', 'I', 'J', 'C', 'S', 'O'
-% end
+if strcmp(Cver, '4') && measured
+    listBoolean = [listBoolean, 'valid', 'outOfLengths', 'outOfPrevious', 'inGlareZone', 'selfOverlap', 'manualInvalid', 'manualValid'];
+    listCell = [listCell, 'cblSubSampled'];
+    listDouble = [listDouble, 'positionCenterX', 'positionCenterY', 'widthCenter', 'overlapPrev'];
+    % Removed deprecated fields from listDouble: 'angleHead', 'angleTail',
+    % 'I', 'J', 'C', 'S', 'O', 'headThrashCount'
+end
 for field = 1:length(listBoolean)
     listOfWorms.(listBoolean{field}) = false(nbOfWorms, nbOfFrames);
 end
@@ -87,6 +93,20 @@ if strcmp(line1{1}{1}, 'format') && strcmp(line2{1}{1}, 'block')
         listOfWorms.lost(ww,ff) = (str2double(sscanf(fgetl(fid),'l %s')) > 0);
         % read the overlapped
         listOfWorms.overlapped(ww,ff) = (str2double(sscanf(fgetl(fid),'o %s')) > 0);
+        if strcmp(Cver,'4') && measured
+            listOfWorms.valid(ww,ff) = (str2double(sscanf(fgetl(fid),'v %s')) > 0);
+            listOfWorms.outOfLengths(ww,ff) = (str2double(sscanf(fgetl(fid),'h %s')) > 0);
+            listOfWorms.outOfPrevious(ww,ff) = (str2double(sscanf(fgetl(fid),'p %s')) > 0);
+            listOfWorms.inGlareZone(ww,ff) = (str2double(sscanf(fgetl(fid),'z %s')) > 0);
+            listOfWorms.selfOverlap(ww,ff) = (str2double(sscanf(fgetl(fid),'s %s')) > 0);
+            listOfWorms.positionCenterX(ww,ff) = str2double(sscanf(fgetl(fid),'a %s'))/factor;
+            listOfWorms.positionCenterY(ww,ff) = str2double(sscanf(fgetl(fid),'b %s'))/factor;
+            listOfWorms.widthCenter(ww,ff) = str2double(sscanf(fgetl(fid),'c %s'))/factor;
+            listOfWorms.cblSubSampled{ww}{ff} = [str2double(sscanf(fgetl(fid),'d %s'));str2double(sscanf(fgetl(fid),'e %s'))]/factor;
+            listOfWorms.overlapPrev(ww,ff) = str2double(sscanf(fgetl(fid),'k %s'))/factor;
+            listOfWorms.manualInvalid(ww,ff) = (str2double(sscanf(fgetl(fid),'n %s')) > 0);
+            listOfWorms.manualValid(ww,ff) = (str2double(sscanf(fgetl(fid),'r %s')) > 0);
+        end
 %         if flagDataOutOfDate
 %             listOfWorms.valid(ww,ff) = (str2double(sscanf(fgetl(fid),'v %s')) > 0);
 %             listOfWorms.outOfLengths(ww,ff) = (str2double(sscanf(fgetl(fid),'h %s')) > 0);

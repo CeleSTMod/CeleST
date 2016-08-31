@@ -18,7 +18,6 @@ if plotAllOn; hold(axesImage, 'on'); end
 if plotAllOn
     try
         currentImage = double(imread( fullfile( fileDBEntry.directory, currentImageFileName) ));
-        currentImage = currentImage(:,:,1);
     catch em
         if flagRobustness
             fprintf(fileToLog, ['***   There was an error reading file: ', num2str(currentImageFileName),' , skipping this file. ***','\n']);
@@ -28,7 +27,7 @@ if plotAllOn
             rethrow(em)
         end
     end
-    imagesc(currentImage,'parent', axesImage);
+    imagesc(currentImage(:,:,1),'parent', axesImage);
 end
 
 try
