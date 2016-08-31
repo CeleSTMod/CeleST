@@ -590,8 +590,10 @@ if fileToLog > 1; fclose(fileToLog); end
                             fileDB(seq).frames_per_second = fileDB(seq).images / fileDB(seq).duration;
                         end
                     end
-                    if isempty(fileDB(seq).scaleFactor)
+                    if ~isfield(fileDB(seq),'scaleFactor') || isempty(fileDB(seq).scaleFactor)
                         fileDB(seq).scaleFactor = 1;
+                    else
+                        fileDB(seq).scaleFactor = fileDB(seq).mm_per_pixel / 0.0201;
                     end
                 end
             end
@@ -794,9 +796,10 @@ if fileToLog > 1; fclose(fileToLog); end
             set(figureAdd, 'color', get(mainPanel,'backgroundcolor'));
             uicontrol('parent', figureAdd, 'style','pushbutton', 'string', 'Add new video', 'position', [20,0,120,30],'callback',@addOK);
             uicontrol('parent', figureAdd, 'style','pushbutton', 'string', 'Cancel', 'position', [200,0,80,30],'callback',@addCancel );
-            for tmpFF = [1:8,10,11,12]
-                uicontrol('parent', figureAdd, 'style', 'text', 'string', fieldsIni{tmpFF}, 'position', [0, 500-20*tmpFF, 120, 20]);
-                tmpfield.(fieldsIni{tmpFF}) = uicontrol('parent', figureAdd, 'style', 'edit', 'string', '', 'position', [140, 500-20*tmpFF, 180, 20]);
+            emptyField = [1:8,10,11,12,24];
+            for tmpFF = 1:length(emptyField)
+                uicontrol('parent', figureAdd, 'style', 'text', 'string', fieldsIni{emptyField(tmpFF)}, 'position', [0, 500-20*tmpFF, 120, 20]);
+                tmpfield.(fieldsIni{emptyField(tmpFF)}) = uicontrol('parent', figureAdd, 'style', 'edit', 'string', '', 'position', [140, 500-20*tmpFF, 180, 20]);
             end
             tmpfield.directory = uicontrol('parent', figureAdd, 'style', 'text', 'string', fieldsIni{9}, 'position', [0, 500-180, 120, 20]);
             uicontrol('parent',figureAdd,'style','pushbutton', 'string', 'Browse...', 'position', [320, 500-22.5*8, 80,20],'callback',@addBrowse);
@@ -836,6 +839,7 @@ if fileToLog > 1; fclose(fileToLog); end
                 else
                     set(tmpfield.images, 'string', '0');
                     set(tmpfield.format, 'string', 'no images');
+                    set(tmpfield.duration,'string', '0')
                 end
             catch exception
                 generateReport(exception)
@@ -875,6 +879,8 @@ if fileToLog > 1; fclose(fileToLog); end
                     tmpNewVideo(1).measured = false;
                     tmpNewVideo(1).format = get(tmpfield.format,'string');
                     tmpNewVideo(1).glareZones = cell(1,0);
+                    tmpNewVideo(1).scaleFactor = tmpNewVideo(1).mm_per_pixel / 0.0201;
+
                     fileDB(end+1) = tmpNewVideo(1);
                     flagOK = true;
                     close(figureAdd);
@@ -930,6 +936,8 @@ if fileToLog > 1; fclose(fileToLog); end
                     tmpNewVideo.segmented = false;
                     tmpNewVideo.worms = 0;
                     tmpNewVideo.measured = false;
+                    tmpNewVideo(1).mm_per_pixel = str2double(tmpNewVideo(1).mm_per_pixel);
+                    tmpNewVideo(1).scaleFactor = tmpNewVideo(1).mm_per_pixel / 0.0201;
                     tmpNewVideo.glareZones = cell(1,0);
                     fileDB(end+1) = tmpNewVideo; %#okAGROW
                 end
