@@ -27,10 +27,10 @@ if plotAllOn
             rethrow(em)
         end
     end
-    imagesc(currentImage,'parent', axesImage);
+    imagesc(currentImage(:,:,1),'parent', axesImage);
 end
 
-try    
+try
     nbOfWormsSegm = length(listOfWormsSegm.skel);
     nbOfWormsTrack = length(listOfWorms.skel);
     cosDraw = cos(2*pi*(0:48)/48);
@@ -79,7 +79,7 @@ try
             ceil( max(cbl(1,:)+width))...  % col max
             ];
         riskOfOverlap(wormS, :) = ( (bboxS(1,wormS) <= bboxT(2,:)) & (bboxT(1,:) <= bboxS(2,wormS))...
-                                  & (bboxS(3,wormS) <= bboxT(4,:)) & (bboxT(3,:) <= bboxS(4,wormS)));
+            & (bboxS(3,wormS) <= bboxT(4,:)) & (bboxT(3,:) <= bboxS(4,wormS)));
     end
     % -----------
     % Compute the matching between the worms
@@ -218,7 +218,7 @@ try
             end
         end
     end
-        
+    
     % -----------
     % Create new worms if need be
     % -----------

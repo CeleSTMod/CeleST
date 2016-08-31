@@ -23,15 +23,15 @@ try
         if tmpFID >= 3
             line1 = fgetl(tmpFID);
             if line1 ~= -1
-                version = sscanf(line1, 'version %s');
+                Cver = sscanf(line1, 'version %s');
                 
-                if ~strcmp(version, CeleSTVersion)
+                if isempty(Cver)
                     if ~flagDataBackedUp
                         backupData(filenames.data);
                         flagDataBackedUp = true;
                     end
                     fileOut = {['version ' CeleSTVersion]};
-                    if isempty(version)
+                    if isempty(Cver)
                         fileOut{end+1} = line1;
                     end
                     textLine = fgetl(tmpFID);
@@ -57,15 +57,15 @@ try
         if tmpMeasFID >= 3
             line1 = fgetl(tmpMeasFID);
             if line1 ~= -1
-                version = sscanf(line1, 'version %s');
+                Cver = sscanf(line1, 'version %s');
                 
-                if ~strcmp(version, CeleSTVersion)
+                if isempty(Cver)
                     if ~flagDataBackedUp
                         backupData(filenames.data);
                         flagDataBackedUp = true;
                     end
                     fileOut = {['version ' CeleSTVersion]};
-                    if isempty(version)
+                    if isempty(Cver)
                         fileOut{end+1} = line1;
                     end
                     textLine = fgetl(tmpMeasFID);
@@ -101,15 +101,15 @@ try
         if tmpSegFID >= 3
             line1 = fgetl(tmpSegFID);
             if line1 ~= -1
-                version = sscanf(line1, 'version %s');
+                Cver = sscanf(line1, 'version %s');
                 
-                if ~strcmp(version, CeleSTVersion)
+                if isempty(Cver)
                     if ~flagDataBackedUp
                         backupData(filenames.data);
                         flagDataBackedUp = true;
                     end
                     fileOut = {['version ' CeleSTVersion]};
-                    if isempty(version)
+                    if isempty(Cver)
                         fileOut{end+1} = line1;
                     end
                     textLine = fgetl(tmpSegFID);

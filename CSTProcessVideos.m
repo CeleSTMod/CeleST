@@ -81,12 +81,14 @@ listVideosToProcIdx = [];
 uicontrol('parent',mainPanel,'style','pushbutton', 'string', 'Select all', 'position', [3*filterW-20 yVideos+3*filterH filterW-10 30], 'callback', @(a,b) set(listVideosToProc, 'value', 1:length(get(listVideosToProc,'string'))))
 uicontrol('parent',mainPanel,'style','pushbutton', 'string', 'Deselect all', 'position', [3*filterW-20+filterW+10 yVideos+3*filterH filterW-10 30], 'callback', @(a,b) set(listVideosToProc, 'value', []))
 btnProcess = uicontrol('parent',mainPanel,'style','pushbutton', 'string', 'Process all the videos listed above', 'position', [3*filterW-20 yVideos-50 2*filterW 30],'Interruptible', 'on', 'callback', @launchProcessing);
-btnProcessInterrupt = uicontrol('parent',mainPanel,'style','pushbutton', 'string', 'Cancel', 'position', [3*filterW-20 yVideos-80 2*filterW 30], 'enable', 'off', 'callback', @launchProcessingInterrupt);
-txtProcStatus = uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','Processing: stopped','position',[3*filterW-20 yVideos-100 2*filterW 20]);
-txtProcTotal = uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','Videos processed: 0 / 0','position',[3*filterW-20 yVideos-120 2*filterW 20]);
-uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','Current video:','position',[3*filterW-20 yVideos-140 filterW 20]);
-txtProcCurrent = uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','< no video >','position',[3*filterW-20 yVideos-160 2*filterW 20]);
-txtProcFrame = uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','Frames processed: 0 / 0','position',[3*filterW-20 yVideos-180 2*filterW 20]);
+btnSetGlare = uicontrol('parent',mainPanel,'style','pushbutton', 'string', 'Set Glare Zones', 'position', [3*filterW-20 yVideos-80 2*filterW 30], 'callback', @setGlareZones);
+btnDrawWorm = uicontrol('parent',mainPanel,'style','pushbutton', 'string', 'Identify Worm', 'position', [3*filterW-20 yVideos-110 2*filterW 30], 'callback', @getWormLength);
+btnProcessInterrupt = uicontrol('parent',mainPanel,'style','pushbutton', 'string', 'Cancel', 'position', [3*filterW-20 yVideos-140 2*filterW 30], 'enable', 'off', 'callback', @launchProcessingInterrupt);
+txtProcStatus = uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','Processing: stopped','position',[3*filterW-20 yVideos-160 2*filterW 20]);
+txtProcTotal = uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','Videos processed: 0 / 0','position',[3*filterW-20 yVideos-180 2*filterW 20]);
+uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','Current video:','position',[3*filterW-20 yVideos-200 filterW 20]);
+txtProcCurrent = uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','< no video >','position',[3*filterW-20 yVideos-220 2*filterW 20]);
+txtProcFrame = uicontrol('parent', mainPanel, 'style' ,'text', 'FontWeight', 'bold','HorizontalAlignment', 'left','String','Frames processed: 0 / 0','position',[3*filterW-20 yVideos-240 2*filterW 20]);
 
 % ----------
 % List of videos with no well
@@ -183,6 +185,8 @@ waitfor(mainFigure,'BeingDeleted','on');
         end
         % ...............
         currentImage = double(imread( fullfile( fileDB(videoBeingProcessed).directory, imageFiles(currentFrameForProcessing).name) ));
+        currentImage = imresize(currentImage(:,:,1), fileDB(videoBeingProcessed).scaleFactor);
+        
         if timingOn; timings(1) = timings(1) + toc ; timingsTime(1) = timingsTime(1) + 1 ; tic; end
         [imHeight, imWidth] = size(currentImage);
         if timingOn; tic; end
@@ -202,9 +206,9 @@ waitfor(mainFigure,'BeingDeleted','on');
             if ischar(fileDB(videoBeingProcessed).well)
                 fileDB(videoBeingProcessed).well = str2num(fileDB(videoBeingProcessed).well); %#ok<*ST2NM>
             end
-            maxX = fileDB(videoBeingProcessed).well(1);
-            maxY = fileDB(videoBeingProcessed).well(2);
-            newRayon = fileDB(videoBeingProcessed).well(3);
+            maxX = fileDB(videoBeingProcessed).well(1) * fileDB(videoBeingProcessed).scaleFactor;
+            maxY = fileDB(videoBeingProcessed).well(2) * fileDB(videoBeingProcessed).scaleFactor;
+            newRayon = fileDB(videoBeingProcessed).well(3) * fileDB(videoBeingProcessed).scaleFactor;
             
             disp(['Process sequence: ', num2str(maxX), ' - ' , num2str(maxY), ' - ' , num2str(newRayon) ]);
             
@@ -225,6 +229,9 @@ waitfor(mainFigure,'BeingDeleted','on');
         zoneOkForStartingWorms(end-imageMarginSize+1:end,:) = false;
         zoneOkForStartingWorms(:,1:imageMarginSize) = false;
         zoneOkForStartingWorms(:,end-imageMarginSize+1:end) = false;
+        for glare = 1:length(fileDB(videoBeingProcessed).glareZones)
+            zoneOkForStartingWorms = zoneOkForStartingWorms.*~(poly2mask(fileDB(videoBeingProcessed).glareZones{glare}(:,1), fileDB(videoBeingProcessed).glareZones{glare}(:,2), imHeight, imWidth));
+        end
         if timingOn; timings(2) = timings(2) + toc ; timingsTime(2) = timingsTime(2) + 1 ; tic; end
         [fileDBEntry,listOfWormsEntry] = CSTSegmentImage(fileDB(videoBeingProcessed), imageFiles(currentFrameForProcessing).name, currentFrameForProcessing, axesImage);
         fileDB(videoBeingProcessed) = fileDBEntry;
@@ -255,12 +262,17 @@ waitfor(mainFigure,'BeingDeleted','on');
             set(txtProcFrame, 'string', ['Frames processed: ', num2str(currentFrameForProcessing), ' / ', num2str(totalFrames)]);
             if timingOn; tic; end
             currentImage = double(imread( fullfile( fileDB(videoBeingProcessed).directory, imageFiles(currentFrameForProcessing).name) ));
+            currentImage = imresize(currentImage(:,:,1), fileDB(videoBeingProcessed).scaleFactor);
+            
             if timingOn; timings(1) = timings(1) + toc ; timingsTime(1) = timingsTime(1) + 1 ; tic; end
             try
                 if floor(iter/stepImagesAuto) == iter/stepImagesAuto
+                    disp(['Processing Frame: ' num2str(currentFrameForProcessing)]);
                     [fileDBEntry,listOfWormsEntry] = CSTSegmentImage(fileDB(videoBeingProcessed), imageFiles(currentFrameForProcessing).name, currentFrameForProcessing, axesImage);
                     CSTTrackWorms(fileDB(videoBeingProcessed), imageFiles(currentFrameForProcessing).name, currentFrameForProcessing, axesImage);
+                    disp(['Before Merge: ' num2str(length(listOfWorms.skel))]);
                     CSTMergeSegmAndTrack(fileDBEntry, listOfWormsEntry, imageFiles(currentFrameForProcessing).name, currentFrameForProcessing, axesImage, nbOfFrames);
+                    disp(['After Merge: ' num2str(length(listOfWorms.skel))]);
                 else
                     CSTTrackWorms(fileDB(videoBeingProcessed), imageFiles(currentFrameForProcessing).name, currentFrameForProcessing, axesImage);
                 end
@@ -273,11 +285,31 @@ waitfor(mainFigure,'BeingDeleted','on');
                 end
             end
         end
+        for wormToCheck = length(listOfWorms.skel):-1:1
+            if any(cellfun(@isempty, listOfWorms.skel{wormToCheck}))
+                listOfWorms.missed(wormToCheck,:) = [];
+                listOfWorms.overlapped(wormToCheck,:) = [];
+                listOfWorms.lost(wormToCheck,:) = [];
+                listOfWorms.skel(wormToCheck) = [];
+                listOfWorms.width(wormToCheck) = [];
+                listOfWorms.localthreshold(wormToCheck) = [];
+                listOfWorms.lengthWorms(wormToCheck,:) = [];
+            end
+        end
+        
+        %         for worm = 1:length(listOfWorms.skel)
+        %             for frame = 1:nbOfFrames
+        %                 listOfWorms.skel{worm}{frame} = listOfWorms.skel{worm}{frame} / fileDB(videoBeingProcessed).scaleFactor;
+        %                 listOfWorms.width{worm}{frame} = listOfWorms.width{worm}{frame} / fileDB(videoBeingProcessed).scaleFactor;
+        %             end
+        %         end
+        %         listOfWorms.lengthWorms = listOfWorms.lengthWorms / fileDB(videoBeingProcessed).scaleFactor;
+        %
         fileDB(videoBeingProcessed).worms = length(listOfWorms.skel);
         fileDB(videoBeingProcessed).segmented = true;
         try
             disp('Writing Segmentation Results...')
-            CSTwriteSegmentationToTXT(listOfWorms, fileDB(videoBeingProcessed).name);
+            CSTwriteSegmentationToTXT(listOfWorms, fileDB(videoBeingProcessed).name, true, 2, 0);
         catch em
             if flagRobustness
                 try
@@ -295,10 +327,12 @@ waitfor(mainFigure,'BeingDeleted','on');
         for tt = 1:length(timingsLabel)
             disp([timingsLabel{tt}, ' : ' , num2str(timings(tt)) , ' / ' , num2str( timingsTime(tt))]);
         end
+        toc
     end
 
 
     function launchProcessing(hObject,eventdata)
+        tic
         flagFinishedProcessing = false;
         if ~isempty(listVideosToProcIdx)
             set(btnProcessInterrupt, 'enable', 'on')
@@ -321,7 +355,7 @@ waitfor(mainFigure,'BeingDeleted','on');
                     return
                 end
             end
-            listToDisable = {btnAddVideos, btnRemoveVideos, btnClose, listVideosNoWell, listVideosWell, btnProcess};
+            listToDisable = {btnAddVideos, btnRemoveVideos, btnClose, listVideosNoWell, listVideosWell, btnProcess, btnSetGlare, btnDrawWorm};
             set(txtProcStatus, 'string', 'Processing: on-going');
             flagOkToDrawWell = false;
             for item = 1:length(listToDisable)
@@ -329,6 +363,7 @@ waitfor(mainFigure,'BeingDeleted','on');
             end
             try
                 for currentVideoIdx = 1:length(listVideosToProcIdx)
+                    tvideo = tic;
                     omega=[];
                     videoBeingProcessed = listVideosToProcIdx(currentVideoIdx);
                     set(txtProcTotal, 'string' , ['Videos processed: ',num2str(currentVideoIdx),' / ', num2str(length(listVideosToProcIdx))]);
@@ -373,9 +408,10 @@ waitfor(mainFigure,'BeingDeleted','on');
                         flagFinishedProcessing = true;
                     end
                     if(fileDB(listVideosToProcIdx(currentVideoIdx)).measured)
-                            delete(fullfile(filenames.measures, ['wormMeas_',fileDB(listVideosToProcIdx(currentVideoIdx)).name,'.txt']));
-                            fileDB(listVideosToProcIdx(seg)).measured = 0;
-                    end  
+                        delete(fullfile(filenames.measures, ['wormMeas_',fileDB(listVideosToProcIdx(currentVideoIdx)).name,'.txt']));
+                        fileDB(listVideosToProcIdx(seg)).measured = 0;
+                    end
+                    toc(tvideo)
                 end
             catch em
                 if flagRobustness
@@ -405,6 +441,90 @@ waitfor(mainFigure,'BeingDeleted','on');
         response = questdlg('Would you like to cancel your current video processing or wait for it to finish?','Cancel Processing','Cancel','Don''t Cancel','Don''t Cancel');
         if strcmp(response, 'Cancel')
             flagCancel = true;
+        end
+    end
+
+    function setGlareZones(hObject, eventdata)
+        if ~isempty(get(listVideosWell, 'value')) && ~isempty(get(listVideosWell,'string'))
+            get(listVideosWell, 'value');
+            idxVideo = listVideosWellIdx(get(listVideosWell, 'value'));
+        elseif ~isempty(get(listVideosNoWell, 'value')) && ~isempty(get(listVideosNoWell,'string'))
+            get(listVideosNoWell, 'value');
+            idxVideo = listVideosNoWellIdx(get(listVideosNoWell, 'value'));
+        else
+            idxVideo = [];
+        end
+        if ~isempty(idxVideo)
+            imageFiles = dir(fullfile(fileDB(idxVideo).directory,['*.',fileDB(idxVideo).format]));
+            if ~isempty(imageFiles)
+                imageForGlareZones = imread( fullfile( fileDB(idxVideo).directory, imageFiles(1).name) );
+                dimImage = 1.5*size(imageForGlareZones);
+                screensize = get(0,'ScreenSize');
+                dimImage = [min(dimImage(1), screensize(4)*0.8) min(max(dimImage(2), 750), screensize(3)*0.8)];
+                popupPosition = [5,40,dimImage(2)+10,dimImage(1)+50];
+                hPolygons = cell(1,length(fileDB(idxVideo).glareZones));
+                hEllipses = cell(1,0);
+                hPopup = figure('Visible','off','Position',popupPosition,'Name','CeleST: Define glare zone','numbertitle','off', 'menubar', 'none', 'windowstyle', 'modal');
+                pnlPopup = uipanel('parent', hPopup,'BorderType', 'none','units','pixels', 'position', [0 0 popupPosition(3) popupPosition(4)]);
+                hAxePopup = axes('parent', pnlPopup, 'units','pixels','position',[5 5 dimImage(2) dimImage(1)],'xtick',[],'ytick',[],'color',[.5 .5 .5]);
+                uicontrol('parent',pnlPopup,'style','pushbutton','string','New Ellipse','position',[105 dimImage(1)+10 100 35],'callback',@(a,b) newEllipse);
+                uicontrol('parent',pnlPopup,'style','pushbutton','string','New Polygon','position',[205 dimImage(1)+10 100 35],'callback',@(a,b) newPolygon);
+                uicontrol('parent',pnlPopup,'style','pushbutton','string','Save and Close','position',[405 dimImage(1)+10 150 35],'callback',@(a,b) saveAll);
+                uicontrol('parent',pnlPopup,'style','pushbutton','string','Erase zones','position',[655 dimImage(1)+10 100 35],'callback',@(a,b) eraseAll);
+                image('parent', hAxePopup, 'cdata', imageForGlareZones);
+                axis(hAxePopup, 'equal', 'off', 'image', 'tight','ij');
+                colormap(gray(255));
+                for zz = 1:length(fileDB(idxVideo).glareZones)
+                    hPolygons{zz} = impoly(hAxePopup, fileDB(idxVideo).glareZones{zz});
+                end
+                hold(hAxePopup, 'on');
+                if ~isempty(idxVideo) && ~isempty(fileDB(idxVideo).well)
+                    if ischar(fileDB(idxVideo).well)
+                        fileDB(idxVideo).well = str2num(fileDB(idxVideo).well); %#ok<*ST2NM>
+                    end
+                    omega(1) = fileDB(idxVideo).well(1);
+                    omega(2) = fileDB(idxVideo).well(2);
+                    radius = fileDB(idxVideo).well(3);
+                    handleCircle = plot(hAxePopup, omega(1) + radius*cos(2*pi*(0:200)/200), omega(2) + radius*sin(2*pi*(0:200)/200), '-r', 'linewidth', 2);
+                end
+                set(hPopup,'visible','on');
+                pause(0.1)
+                waitfor(hPopup,'BeingDeleted','on');
+            end
+        end
+        
+        function newEllipse
+            hEllipses{end+1} = imellipse(hAxePopup);
+        end
+        
+        function newPolygon
+            hPolygons{end+1} = impoly(hAxePopup);
+        end
+        function eraseAll
+            choice = questdlg('Are you sure you want to erase all the zones?','Erase zones','Erase','Cancel','Cancel');
+            if strcmp(choice,'Erase')
+                for it = 1:length(hPolygons)
+                    delete(hPolygons{it});
+                end
+                for it = 1:length(hEllipses)
+                    delete(hEllipses{it});
+                end
+                hPolygons = cell(1,0);
+                hEllipses = cell(1,0);
+            end
+        end
+        function saveAll
+            fileDB(idxVideo).glareZones = cell(1,0);
+            for it = 1:length(hPolygons)
+                tmpVertices = round(getPosition(hPolygons{it}));
+                fileDB(idxVideo).glareZones{end+1} = tmpVertices([1:end,1],:);
+            end
+            for it = 1:length(hEllipses)
+                tmpVertices = round(getVertices(hEllipses{it}));
+                fileDB(idxVideo).glareZones{end+1} = tmpVertices(1:2:end,:);
+            end
+            set(hPopup,'visible','off');
+            delete(hPopup);
         end
     end
 
@@ -480,6 +600,70 @@ waitfor(mainFigure,'BeingDeleted','on');
         end
     end
 
+% ------------
+% Identify worm length
+% ------------
+    function getWormLength(hObject, eventdata)
+        if ~isempty(get(listVideosWell, 'value')) && ~isempty(get(listVideosWell,'string'))
+            get(listVideosWell, 'value');
+            idxVideo = listVideosWellIdx(get(listVideosWell, 'value'));
+        elseif ~isempty(get(listVideosNoWell, 'value')) && ~isempty(get(listVideosNoWell,'string'))
+            get(listVideosNoWell, 'value');
+            idxVideo = listVideosNoWellIdx(get(listVideosNoWell, 'value'));
+        else
+            idxVideo = [];
+        end
+        if ~isempty(idxVideo)
+            imageFiles = dir(fullfile(fileDB(idxVideo).directory,['*.',fileDB(idxVideo).format]));
+            if ~isempty(imageFiles)
+                imageForWormLength = imread( fullfile( fileDB(idxVideo).directory, imageFiles(1).name) );
+                dimImage = 1.5*size(imageForWormLength);
+                screensize = get(0,'ScreenSize');
+                dimImage = [min(dimImage(1), screensize(4)*0.8) min(max(dimImage(2), 550), screensize(3)*0.8)];
+                popupPosition = [5,40,dimImage(2)+10,dimImage(1)+50];
+                hPopup = figure('Visible','off','Position',popupPosition,'Name','CeleST: Define glare zone','numbertitle','off', 'windowstyle', 'modal', 'WindowButtonDownFcn', @drawPoint);
+                pnlPopup = uipanel('parent', hPopup,'BorderType', 'none','units','pixels', 'position', [0 0 popupPosition(3) popupPosition(4)]);
+                hAxePopup = axes('parent', pnlPopup, 'units','pixels','position',[5 5 dimImage(2) dimImage(1)],'xtick',[],'ytick',[],'color',[.5 .5 .5]);
+                uicontrol('parent',pnlPopup,'style','pushbutton','string','Erase Points','position',[105 dimImage(1)+10 100 35],'callback',@erasePoints);
+                uicontrol('parent',pnlPopup,'style','pushbutton','string','Save and Close','position',[205 dimImage(1)+10 100 35],'callback',@saveLength);
+                uicontrol('parent',pnlPopup,'style','text','string','Click to Draw Points forming a Line through the Center of One Worm. Click ''Save and Close'' when done','position',[305 dimImage(1)+10 250 35]);
+                
+                image('parent', hAxePopup, 'cdata', imageForWormLength);
+                axis(hAxePopup, 'equal', 'off', 'image', 'tight','ij');
+                colormap(gray(255));
+                
+                wormLength = [];
+                wormPoints = [];
+                wormPlots = [];
+                hold(hAxePopup, 'on')
+                set(hPopup, 'Visible', 'On')
+                pause(0.1)
+                waitfor(hPopup, 'BeingDeleted', 'On')
+            end
+        end
+        function drawPoint(hObject, eventdata)
+            if (get(get(hPopup,'CurrentObject'), 'parent') == hAxePopup)
+                if strcmp(get(hObject,'SelectionType'),'normal')
+                    wormPoints(:,end+1) = hAxePopup.CurrentPoint(1,1:2)';
+                    wormPlots(end+1) = plot(wormPoints(1,end), wormPoints(2,end), 'r*');
+                    if size(wormPoints, 2) > 1
+                        wormPlots(end+1) = plot(wormPoints(1,end-1:end), wormPoints(2,end-1:end), 'r');
+                    end
+                    wormLength = sum(hypot(wormPoints(1,2:end) - wormPoints(1,1:end-1), wormPoints(2,2:end) - wormPoints(2,1:end-1)));
+                end
+            end
+        end
+        function erasePoints(hObject, eventdata)
+            wormPoints = [];
+            wormLength = [];
+            delete(wormPlots);
+        end
+        function saveLength(hObject, eventdata)
+            if ~isempty(wormLength)
+                fileDB(idxVideo).scaleFactor = 60 / wormLength;
+            end
+        end
+    end
 
 % ------------
 % Mouse button down
@@ -505,7 +689,6 @@ waitfor(mainFigure,'BeingDeleted','on');
                             end
                             handleCircle = plot(omega(1) + radius*cos(2*pi*(0:200)/200), omega(2) + radius*sin(2*pi*(0:200)/200), '-r', 'linewidth', 2);
                             fileDB(idxVideo).well = [omega(1), omega(2), radius];
-                            fileDB(idxVideo).mm_per_pixel = 5/fileDB(idxVideo).well(3);
                         end
                     end
                 else
@@ -517,7 +700,6 @@ waitfor(mainFigure,'BeingDeleted','on');
                         delete(handlesPoints(end));
                         handlesPoints(end) = [];
                         fileDB(idxVideo).well = [];
-                        fileDB(idxVideo).mm_per_pixel = 1;
                         if ~isempty(handleCircle) && ishandle(handleCircle)
                             delete(handleCircle);
                             handleCircle = [];

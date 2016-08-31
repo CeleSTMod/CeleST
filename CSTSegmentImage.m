@@ -8,12 +8,14 @@ function [fileDBEntry,listOfWormsEntry] = CSTSegmentImage(fileDBEntry, currentIm
 % -------------------
 % Look for worms on single image
 % -------------------
-global currentImage zoneOkForCompleteWorms zoneOkForStartingWorms traceOn timingOn timings timingsTime plotAllOn flagRobustness fileToLog flagVIP;
+global segFigs currentImage zoneOkForCompleteWorms zoneOkForStartingWorms traceOn timingOn timings timingsTime plotAllOn flagRobustness fileToLog;
 
 if timingOn; tic; end
 if traceOn; fprintf(fileToLog, ['processing frame ', num2str(currentFrameForProcessing), ' from ', fileDBEntry.name,' : ', currentImageFileName, '\n']); end
 
 if plotAllOn; hold(axesImage, 'on');end
+
+segFigs = struct;
 
 % -------------------
 % Initialize variables
@@ -35,6 +37,8 @@ templateDist = realsqrt(repmat((-templateDistLength:templateDistLength).^2,2*tem
 % ===========
 try
     currentImage = double(imread( fullfile( fileDBEntry.directory, currentImageFileName) ));
+    currentImage = imresize(currentImage(:,:,1), fileDBEntry.scaleFactor);
+    segFigs.startingImage = currentImage;
     imHeight = size(currentImage,1);
     imWidth = size(currentImage,2);
 catch em
@@ -46,6 +50,7 @@ catch em
         rethrow(em)
     end
 end
+
 if timingOn; timings(1) = timings(1) + toc ; timingsTime(1) = timingsTime(1) + 1 ; tic; end
 % ===========
 % GET THE INSIDE BORDER OF THE CICRLE WHERE WORMS ARE SWIMMING
@@ -61,9 +66,9 @@ else
     if ischar(fileDBEntry.well)
         fileDBEntry.well = str2num(fileDBEntry.well); %#ok<*ST2NM>
     end
-    maxX = fileDBEntry.well(1);
-    maxY = fileDBEntry.well(2);
-    newRayon = fileDBEntry.well(3);
+    maxX = fileDBEntry.well(1) * fileDBEntry.scaleFactor;
+    maxY = fileDBEntry.well(2) * fileDBEntry.scaleFactor;
+    newRayon = fileDBEntry.well(3) * fileDBEntry.scaleFactor;
 end
 
 % -----------
@@ -87,6 +92,7 @@ if plotAllOn; plot(B{1}(:,2), B{1}(:,1),'--r', 'parent', axesImage);end
 % Compute the standard deviation on small patches of smoothed image
 % -----------
 imageProcForBorders = stdfilt(medfilt2(currentImage,[3 3],'symmetric'),filterMask);
+segFigs.preProcStd = imageProcForBorders;
 % -----------
 % Compute the gradient on that preprocessed image
 % -----------
@@ -99,6 +105,9 @@ FYProcSmooth = imfilter(FYProc, flatMask, 'symmetric');
 FXProcSmooth = imfilter(FXProcSmooth,flatMask, 'symmetric');
 FYProcSmooth = imfilter(FYProcSmooth, flatMask, 'symmetric');
 intGradProc = hypot(FXProcSmooth, FYProcSmooth);
+segFigs.Xgrad = FXProcSmooth;
+segFigs.Ygrad = FYProcSmooth;
+segFigs.gradient = intGradProc;
 
 % -----------
 % Clip the image to the disk where worms are swimming
@@ -153,7 +162,6 @@ listOfWormsPotential.width = cell(1,0);
 listOfWormsPotential.localthreshold = cell(1,0);
 for wormCandidate = 1:50
     try
-        
         % ===========
         % BUILD A CANDIDATE BORDER
         % ===========
@@ -163,6 +171,8 @@ for wormCandidate = 1:50
         [valMaxInCol, indicesInRows] = max(potentialMax .* intGradProc);
         [valM, maxX] = max(valMaxInCol);
         maxY = indicesInRows(maxX);
+        segFigs.worm(wormCandidate).searchArea = (potentialMax .* intGradProc);
+        segFigs.worm(wormCandidate).startPoint = [maxX, maxY];
         % -----------
         % Construct a border from that point
         % -----------
@@ -183,7 +193,7 @@ for wormCandidate = 1:50
             % ...........
             % For other worms, check that the starting point has an intensity above half of the global maximum, otherwise stop
             % ...........
-            break
+            %  break
         end
         coordsInt = floor(0.5 + boundCandidate(:, end));
         
@@ -192,7 +202,7 @@ for wormCandidate = 1:50
         % -----------
         iter = 1;
         interpGradCandidate = [];
-        while iter <= 10000 && ~(flagClosedWorm || flagReachedTheEdge || flagGradientTooSmall)
+        while iter <= 1000 && ~(flagClosedWorm || flagReachedTheEdge || flagGradientTooSmall)
             iter = iter + 1;
             % -----------
             % Interpolate the gradient at the location of the latest point
@@ -209,6 +219,11 @@ for wormCandidate = 1:50
                 + lastPointRelative(1)  * FYProcSmooth(lastPointInt(2),  lastPointInt(1)+1) )...
                 + lastPointRelative(2) * ( (1 - lastPointRelative(1)) * FYProcSmooth(lastPointInt(2)+1,lastPointInt(1))...
                 + lastPointRelative(1)  * FYProcSmooth(lastPointInt(2)+1,lastPointInt(1)+1) );
+            
+            segFigs.worm(wormCandidate).interpData{iter} = [lastPoint lastPointInt lastPointRelative];
+            segFigs.worm(wormCandidate).interpGradCandidate{iter} = interpGradCandidate;
+            segFigs.worm(wormCandidate).nextPointVector{iter} = [-interpGradCandidate(2); interpGradCandidate(1)] / max(gradientMinimum,norm(interpGradCandidate));
+            
             % -----------
             % Define the new point
             % -----------
@@ -347,6 +362,7 @@ for wormCandidate = 1:50
         % BUILD A WORM BORDER WITHIN THE CANDIDATE BORDER
         % =============
         bound = boundCandidate;
+        segFigs.worm(wormCandidate).bound = bound;
         % -------------
         % Smooth the border at the connection between the two ends
         % -------------
@@ -413,6 +429,7 @@ for wormCandidate = 1:50
             bound = interp1q(curvCoord', bound', linspace(curvCoord(1),curvCoord(end),floor(length(curvCoord)/5))')';
             bound = interp1q((1:length(bound))', bound', linspace(1,length(bound),length(curvCoord))')';
         end
+        
         if timingOn; timings(2) = timings(2) + toc ; timingsTime(2) = timingsTime(2) + 1 ; tic; end
         if plotAllOn; plot(bound(1,[1:end,1]), bound(2,[1:end,1]),':y', 'parent', axesImage); end
         
@@ -497,6 +514,7 @@ for wormCandidate = 1:50
         forgotten = ~maskCBLWidth & maskOriginal & (subImage > thresholdAppearance);
         [labelForgotten, numForgotten] = bwlabel(forgotten);
         if timingOn; timings(7) = timings(7) + toc ; timingsTime(7) = timingsTime(7) + 1 ; tic; end
+        bboxForgotten = bbox;
         for numtmp = 1:numForgotten
             currentNum = numel(find(labelForgotten == numtmp));
             % ------------
@@ -507,7 +525,7 @@ for wormCandidate = 1:50
                 % ------------
                 % Compute a CBL+width within those pixels
                 % ------------
-                [xyskelNew, widthNew] = findWormCBLWithinFixedMask(bbox, possiblePixels);
+                [xyskelNew, widthNew] = findWormCBLWithinFixedMask(bboxForgotten, possiblePixels);
                 if isempty(xyskelNew); continue; end
                 % ------------
                 % Reconstruct a border
@@ -554,19 +572,13 @@ for currentWorm = 1:length(listOfWormsPotential.skel)
             listOfWormsPotential.skel{currentWorm}(2,2:end)-listOfWormsPotential.skel{currentWorm}(2,1:end-1))));
         maxWidth = max(listOfWormsPotential.width{currentWorm});
         meanWidth = mean(listOfWormsPotential.width{currentWorm});
-        flagLength = (longueur >= 15) && (longueur <= 120);
+        flagLength = (longueur >= 35) && (longueur <= 120);
         flagWidth1 = (maxWidth <= 2 * meanWidth);
         flagWidth2 = (maxWidth <= 8) && (meanWidth <= 5);
         if flagLength && flagWidth1 && flagWidth2
             listOfWormsFiltered.skel{end+1} = listOfWormsPotential.skel{currentWorm};
             listOfWormsFiltered.width{end+1} = listOfWormsPotential.width{currentWorm};
             listOfWormsFiltered.localthreshold{end+1} = listOfWormsPotential.localthreshold{currentWorm};
-        else
-            if flagVIP
-                % figure to let users choose if it's a worm or not
-                % including a yes or no button, the image in question, and
-                % a question
-            end
         end
     catch em
         if flagRobustness
@@ -621,6 +633,7 @@ listOfWormsEntry.skel = cell(1,nbOfWorms);
 listOfWormsEntry.width = cell(1,nbOfWorms);
 listOfWormsEntry.localthreshold = cell(1,nbOfWorms);
 listOfWormsEntry.lengthWorms = zeros(nbOfWorms);
+% figure; imagesc(currentImage); title(['Frame: ' num2str(currentFrameForProcessing)]); hold on
 for currentWorm = 1:length(flagsFilteredToKeep)
     try
         if flagsFilteredToKeep(currentWorm)
@@ -630,6 +643,7 @@ for currentWorm = 1:length(flagsFilteredToKeep)
             listOfWormsEntry.localthreshold{newWormIdx} = listOfWormsFiltered.localthreshold{currentWorm};
             listOfWormsEntry.lengthWorms(newWormIdx) = sum(hypot(listOfWormsEntry.skel{newWormIdx}(1,2:end)-listOfWormsEntry.skel{newWormIdx}(1,1:end-1),...
                 listOfWormsEntry.skel{newWormIdx}(2,2:end)-listOfWormsEntry.skel{newWormIdx}(2,1:end-1)));
+            %             plot(listOfWormsEntry.skel{newWormIdx}(1,:), listOfWormsEntry.skel{newWormIdx}(2,:));
         end
     catch em
         if flagRobustness
@@ -641,6 +655,8 @@ for currentWorm = 1:length(flagsFilteredToKeep)
         continue
     end
 end
+% save(['low' num2str(currentFrameForProcessing) '.mat'], 'listOfWormsEntry');
+disp([num2str(nbOfWorms) ' worms segmented from frame: ' num2str(currentFrameForProcessing)])
 if timingOn; timings(6) = timings(6) + toc ; timingsTime(6) = timingsTime(6) + 1 ; tic; end
 
 
@@ -701,6 +717,8 @@ if timingOn; timings(6) = timings(6) + toc ; timingsTime(6) = timingsTime(6) + 1
         [valMaxInCol, indicesInRows] = max(bwdist(~maskWorm) .* (subImage - thresholdAppearance));
         [widthMax, maxX] = max(valMaxInCol);
         maxY = indicesInRows(maxX);
+        segFigs.worm(wormCandidate).getPointMask = (bwdist(~maskWorm) .* (subImage - thresholdAppearance));
+        segFigs.worm(wormCandidate).pointInside = [maxX, maxY];
         pointInside = [maxX+bbox(3)-1; maxY+bbox(1)-1];
     end
 
@@ -781,6 +799,7 @@ if timingOn; timings(6) = timings(6) + toc ; timingsTime(6) = timingsTime(6) + 1
 % ------------
     function [xyskel, width] = findWormCBLWithinMask(maskWhereToLook, bbox, magnifFactor)
         maskInside = bwdist(~maskWhereToLook);
+        segFigs.worm(wormCandidate).distTransformMask = maskInside;
         
         rangeAnglesMax = 48;
         rangeAngles = 1:rangeAnglesMax;
@@ -790,7 +809,8 @@ if timingOn; timings(6) = timings(6) + toc ; timingsTime(6) = timingsTime(6) + 1
         [valMaxInCol, indicesInRows] = max(maskInside);
         [widthMax, maxX] = max(valMaxInCol);
         maxY = indicesInRows(maxX);
-        if widthMax > 10*magnifFactor
+        segFigs.worm(wormCandidate).CBLStart = [maxX, maxY];
+        if widthMax > 40*magnifFactor
             xyskel = [];
             width = [];
             return
@@ -807,6 +827,10 @@ if timingOn; timings(6) = timings(6) + toc ; timingsTime(6) = timingsTime(6) + 1
         firstWidth = 0;
         keepBuildingCBL = true;
         stepCBLSize = widthMax;
+        
+        segFigs.worm(wormCandidate).forwardSearchPoint = [];
+        segFigs.worm(wormCandidate).backwardSearchPoint = [];
+        
         % ------------
         % find successive points
         % ------------
@@ -860,6 +884,17 @@ if timingOn; timings(6) = timings(6) + toc ; timingsTime(6) = timingsTime(6) + 1
                     firstAngle = rangeAngles(indNext);
                     firstWidth = widthMax;
                     rangeAngles = -(rangeAnglesMax/8):(rangeAnglesMax/8);
+                    segFigs.worm(wormCandidate).firstSearch = coords;
+                    segFigs.worm(wormCandidate).forwardSearch{iter} = coords;
+                    segFigs.worm(wormCandidate).forwardSearchPoint = [segFigs.worm(wormCandidate).forwardSearchPoint newPoint];
+                else
+                    if searchForward
+                        segFigs.worm(wormCandidate).forwardSearch{iter} = coords;
+                        segFigs.worm(wormCandidate).forwardSearchPoint = [segFigs.worm(wormCandidate).forwardSearchPoint newPoint];
+                    else
+                        segFigs.worm(wormCandidate).backwardSearch{iter} = coords;
+                        segFigs.worm(wormCandidate).backwardSearchPoint = [segFigs.worm(wormCandidate).backwardSearchPoint newPoint];
+                    end
                 end
                 % ------------
                 % store the latest point

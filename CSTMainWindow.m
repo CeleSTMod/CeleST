@@ -24,7 +24,7 @@ timingsLabel = {'load image', 'preprocess', 'find borders', 'compute appearance'
     'detect overlap risk', 'track cbl', 'adjust model'};
 timings = zeros(1,length(timingsLabel));
 timingsTime = zeros(1,length(timingsLabel));
-CeleSTVersion = '3';
+CeleSTVersion = '4';
 startupDataCheck = false;
 logToFile = true;
 
@@ -50,12 +50,13 @@ filenames.segmentation = fullfile(filenames.data, 'segmentation');
 filenames.export = fullfile(filenames.data, 'export');
 filenames.file_management = fullfile(filenames.data, 'file_management');
 filenames.measures = fullfile(filenames.data, 'measures');
+filenames.curvature = fullfile(filenames.data, 'curvatures');
 filenames.listOfExtensions = {'bmp', 'tif', 'tiff', 'png', 'jpg'};
 
 % ===============
 % Data base fields
 % ===============
-fieldsIni = cell(1,24);
+fieldsIni = cell(1,25);
 fieldsIni{ 1} = 'name';
 fieldsIni{ 2} = 'author';
 fieldsIni{ 3} = 'date';
@@ -67,19 +68,20 @@ fieldsIni{ 8} = 'note';
 fieldsIni{ 9} = 'directory';
 fieldsIni{10} = 'images';
 fieldsIni{11} = 'duration';
-fieldsIni{12} = 'frames_per_second';
-fieldsIni{13} = 'mm_per_pixel';
+fieldsIni{12} = 'mm_per_pixel';
+fieldsIni{13} = 'frames_per_second';
 fieldsIni{14} = 'well';
 fieldsIni{15} = 'segmented';
 fieldsIni{16} = 'worms';
 fieldsIni{17} = 'measured';
-fieldsIni{18} = 'format';
-fieldsIni{19} = 'glareZones';
-fieldsIni{20} = 'experiment';
-fieldsIni{21} = 'month';
-fieldsIni{22} = 'day';
-fieldsIni{23} = 'year';
-fieldsIni{24} = 'class';
+fieldsIni{18} = 'experiment';
+fieldsIni{19} = 'month';
+fieldsIni{20} = 'day';
+fieldsIni{21} = 'year';
+fieldsIni{22} = 'class';
+fieldsIni{23} = 'scaleFactor';
+fieldsIni{24} = 'format';
+fieldsIni{25} = 'glareZones';
 
 % -------------------
 % Create the directories if need be
@@ -189,7 +191,7 @@ colFtlWell = find(strcmp('well', filterNames));
 % ----------
 % List of videos
 % ----------
-editable = [true(1,12), false(1,6)];
+editable = [true(1,12), false(1,6), true(1,5)];
 tableVideos = uitable('parent',mainPanel,'position',[0 30 mainPanelPosition(3)-330 yFilters-30],'RearrangeableColumn','on','ColumnEditable',[],'CellEditCallback', @tableEdit,'ColumnWidth','auto');
 listVideosIdx = [];
 populateFilters
@@ -588,6 +590,9 @@ if fileToLog > 1; fclose(fileToLog); end
                             fileDB(seq).frames_per_second = fileDB(seq).images / fileDB(seq).duration;
                         end
                     end
+                    if isempty(fileDB(seq).scaleFactor)
+                        fileDB(seq).scaleFactor = 1;
+                    end
                 end
             end
             if ~startupDataCheck
@@ -789,15 +794,12 @@ if fileToLog > 1; fclose(fileToLog); end
             set(figureAdd, 'color', get(mainPanel,'backgroundcolor'));
             uicontrol('parent', figureAdd, 'style','pushbutton', 'string', 'Add new video', 'position', [20,0,120,30],'callback',@addOK);
             uicontrol('parent', figureAdd, 'style','pushbutton', 'string', 'Cancel', 'position', [200,0,80,30],'callback',@addCancel );
-            for tmpFF = [1:8,10,11]
+            for tmpFF = [1:8,10,11,12]
                 uicontrol('parent', figureAdd, 'style', 'text', 'string', fieldsIni{tmpFF}, 'position', [0, 500-20*tmpFF, 120, 20]);
                 tmpfield.(fieldsIni{tmpFF}) = uicontrol('parent', figureAdd, 'style', 'edit', 'string', '', 'position', [140, 500-20*tmpFF, 180, 20]);
             end
+            tmpfield.directory = uicontrol('parent', figureAdd, 'style', 'text', 'string', fieldsIni{9}, 'position', [0, 500-180, 120, 20]);
             uicontrol('parent',figureAdd,'style','pushbutton', 'string', 'Browse...', 'position', [320, 500-22.5*8, 80,20],'callback',@addBrowse);
-            for tmpFF = [9,12:20]
-                uicontrol('parent', figureAdd, 'style', 'text', 'string', fieldsIni{tmpFF}, 'position', [0, 500-20*tmpFF, 120, 20]);
-                tmpfield.(fieldsIni{tmpFF}) = uicontrol('parent', figureAdd, 'style', 'text', 'string', '', 'position', [140, 500-20*tmpFF, 180, 20]);
-            end
             set(tmpfield.directory,'callback',@addCheckDir);
             waitfor(figureAdd,'BeingDeleted','on');
             if flagOK
@@ -841,8 +843,15 @@ if fileToLog > 1; fclose(fileToLog); end
         end
         function addOK(hObject,eventdata) %#ok<INUSD>
             try
-                if isempty(get(tmpfield.name,'string')) || isempty(get(tmpfield.directory,'string'))
-                    errordlg('Missing one or more required field','Input Error')
+                requiredFields = {'name', 'directory', 'duration', 'mm_per_pixel'};
+                missingFields = zeros(length(requiredFields), 1);
+                for fr = 1:length(requiredFields)
+                    if isempty(get(tmpfield.(requiredFields{fr}), 'string'))
+                        missingFields(fr) = 1;
+                    end
+                end
+                if any(missingFields)
+                    errordlg([ 'Missing required fields: ' strjoin(requiredFields(logical(missingFields)), ', ') ], 'Input Error')
                 elseif str2double(get(tmpfield.images,'string')) <= 1
                     errordlg('Videos must have at least two frames/images','Single Image Input')    
                 else
@@ -859,7 +868,7 @@ if fileToLog > 1; fclose(fileToLog); end
                     tmpNewVideo(1).images = str2double(get(tmpfield.images,'string'));
                     tmpNewVideo(1).duration = str2double(get(tmpfield.duration,'string'));
                     tmpNewVideo(1).frames_per_second = tmpNewVideo(1).images / tmpNewVideo(1).duration;
-                    tmpNewVideo(1).mm_per_pixel = 1;
+                    tmpNewVideo(1).mm_per_pixel = str2double(get(tmpfield.mm_per_pixel,'string'));
                     tmpNewVideo(1).well = [];
                     tmpNewVideo(1).segmented = false;
                     tmpNewVideo(1).worms = 0;
@@ -884,6 +893,7 @@ if fileToLog > 1; fclose(fileToLog); end
             sampleFileDirs = uipickfiles;
             if ~iscell(sampleFileDirs); return; end
             template = commonPropertySet;
+            if isempty(template); return; end
             suffix = template.suffix;
             template = rmfield(template, 'suffix');
             for i = 1:numel(sampleFileDirs)
@@ -916,7 +926,6 @@ if fileToLog > 1; fclose(fileToLog); end
                         tmpNewVideo.duration = 0;
                     end
                     tmpNewVideo.frames_per_second = tmpNewVideo.images / tmpNewVideo.duration;
-                    tmpNewVideo.mm_per_pixel = 1;
                     tmpNewVideo.well = [];
                     tmpNewVideo.segmented = false;
                     tmpNewVideo.worms = 0;
@@ -965,22 +974,22 @@ if fileToLog > 1; fclose(fileToLog); end
             propList(1).trial = NaN;
             propList(1).note = '';
             propList(1).suffix = '';
-            
+
             figureCommonProp = figure('Visible','on','Position',[50,100,400,500],'Name','CeleST: Set Common Properties', 'numbertitle','off','menubar','none');
             set(figureCommonProp, 'color', get(mainPanel,'backgroundcolor'));
-            uicontrol('parent', figureCommonProp, 'style','pushbutton', 'string', 'Finish', 'position', [125,25,150,30],'callback', @propFinish);
+            uicontrol('parent', figureCommonProp, 'style','pushbutton', 'string', 'Finish', 'position', [33,25,150,30],'callback', @propFinish);
+            uicontrol('parent', figureCommonProp, 'style','pushbutton', 'string', 'Cancel', 'position', [216,25,150,30],'callback', @propCancel);
             
             uicontrol('parent', figureCommonProp, 'style', 'text', 'string', 'suffix', 'HorizontalAlignment', 'left', 'position', [25, 475-20, 120, 20]);
             tmpfield.suffix = uicontrol('parent', figureCommonProp, 'style', 'edit', 'string', '', 'position', [125, 475-20, 250, 20], 'Tag', 'suffix', 'Callback', @fillTemplate);
             
-            emptyField = [2:8,11,20];
+            emptyField = [2:8,11,12];
             for tmpFF = 1:length(emptyField)
                 uicontrol('parent', figureCommonProp, 'style', 'text', 'string', fieldsIni{emptyField(tmpFF)}, 'HorizontalAlignment', 'left', 'position', [25, 475-20*(tmpFF+1), 120, 20]);
                 tmpfield.(fieldsIni{emptyField(tmpFF)}) = uicontrol('parent', figureCommonProp, 'style', 'edit', 'string', '', 'position', [125, 475-20*(tmpFF+1), 250, 20], 'Tag', fieldsIni{emptyField(tmpFF)}, 'Callback', @fillTemplate);
             end
             
             waitfor(figureCommonProp,'BeingDeleted','on');
-            propertyTemplate = propList(1);
             
         catch exception
             generateReport(exception);
@@ -988,8 +997,17 @@ if fileToLog > 1; fclose(fileToLog); end
         function fillTemplate(~,eventdata)
             propList(1).(eventdata.Source.Tag) = eventdata.Source.String;
         end
-        function propFinish(~, ~)
+        function propCancel(~, ~)
+            propertyTemplate = [];
             close(figureCommonProp);
+        end
+        function propFinish(~, ~)
+            if isempty(get(tmpfield.duration, 'string')) || isempty(get(tmpfield.mm_per_pixel, 'string'))
+                errordlg('Required fields: Duration and mm_per_pixel must both be filled in', 'Input Error')
+            else
+                propertyTemplate = propList(1);
+                close(figureCommonProp);
+            end
         end
     end
 
