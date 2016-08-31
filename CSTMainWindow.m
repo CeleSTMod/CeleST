@@ -29,12 +29,12 @@ startupDataCheck = false;
 logToFile = true;
 
 matver = regexp(version,'R\w*','match','once');
-if ~strcmpi(matver,'R2015b')
-    msgbox( {['Celest was built for MATLAB R2015b, but is currently being run on MATLAB ' matver ','], '', ...
-        ['CeleST''s behavior on MATLAB ' matver ' is undefined and could potentially lead to data loss.'], '', ...
-        'Please run CeleST on MATLAB R2015b or refer to the installation guide to ensure the proper runtime was installed.'}, ...
-        'Warning: Wrong MATLAB version detected' );
-end
+% if ~strcmpi(matver,'R2015b')
+%     msgbox( {['Celest was built for MATLAB R2015b, but is currently being run on MATLAB ' matver ','], '', ...
+%         ['CeleST''s behavior on MATLAB ' matver ' is undefined and could potentially lead to data loss.'], '', ...
+%         'Please run CeleST on MATLAB R2015b or refer to the installation guide to ensure the proper runtime was installed.'}, ...
+%         'Warning: Wrong MATLAB version detected' );
+% end
 
 % ===============
 % Directories
@@ -193,7 +193,7 @@ editable = [true(1,12), false(1,6)];
 tableVideos = uitable('parent',mainPanel,'position',[0 30 mainPanelPosition(3)-330 yFilters-30],'RearrangeableColumn','on','ColumnEditable',[],'CellEditCallback', @tableEdit,'ColumnWidth','auto');
 listVideosIdx = [];
 populateFilters
-checkVideoDirectories
+% checkVideoDirectories
 checkSequences
 set(mainFigure,'visible','on')
 pause(0.1)
@@ -256,6 +256,7 @@ if fileToLog > 1; fclose(fileToLog); end
             set(mainFigure,'Visible','off');
             CSTCheckResults
             set(mainFigure,'Visible','on');
+
             flagConsistentButton = false;
             checkSequences
             populateFilters
@@ -703,7 +704,7 @@ if fileToLog > 1; fclose(fileToLog); end
             while currDir <= filesLeft
                 if ~exist(fileDB(currDir).directory,'dir')
                     question = ['The folder for ' fileDB(currDir).name ' appears to have changed or been deleted from ' fileDB(currDir).directory '. Would you like to try and find it''s new location? If the directory has been deleted, consider deleting the sample as well'];
-                    action = questdlg(question, 'Directory Not Found', 'Find Directory', 'Delete Video', 'Ignore', 'Ignore');
+                    action = questdlg(question, 'Directory Not Found', 'Find Directory', 'Delete Video', 'Ignore', 'Ignore All', 'Ignore');
                     switch action
                         case 'Find Directory'
                             newPath = '';
@@ -735,6 +736,8 @@ if fileToLog > 1; fclose(fileToLog); end
                         case 'Delete Video'
                             removeVideos(currDir);
                             filesLeft = filesLeft - 1;
+                        case 'Ignore all'
+                            break
                         otherwise
                             disp(['Ignoring directory not found for: ' fileDB(currDir).directory]);
                     end

@@ -27,7 +27,8 @@ try
                 
                 if ~strcmp(version, CeleSTVersion)
                     if ~flagDataBackedUp
-                        flagDataBackedUp = backupData;
+                        backupData(filenames.data);
+                        flagDataBackedUp = true;
                     end
                     fileOut = {['version ' CeleSTVersion]};
                     if isempty(version)
@@ -41,6 +42,7 @@ try
                     fclose(tmpFID);
                     
                     tmpFID = fopen(fullfile(filenames.segmentation,['wormSegm_',fileDB(segCheck).name,'.txt']), 'w');
+                    disp(['Updating: ' fullfile(filenames.segmentation,['wormSegm_',fileDB(segCheck).name,'.txt'])])
                     for i = 1:length(fileOut)
                         fprintf(tmpFID, '%s\n', fileOut{i});
                     end
@@ -59,7 +61,8 @@ try
                 
                 if ~strcmp(version, CeleSTVersion)
                     if ~flagDataBackedUp
-                        flagDataBackedUp = backupData;
+                        backupData(filenames.data);
+                        flagDataBackedUp = true;
                     end
                     fileOut = {['version ' CeleSTVersion]};
                     if isempty(version)
@@ -83,6 +86,7 @@ try
                     fclose(tmpMeasFID);
                     
                     tmpMeasFID = fopen(fullfile(filenames.measures,['wormMeas_',fileDB(measAndSegCheck).name,'.txt']), 'w');
+                    disp(['Updating: ' fullfile(filenames.measures,['wormSegm_',fileDB(measAndSegCheck).name,'.txt'])])
                     for i = 1:length(fileOut)
                         fprintf(tmpMeasFID, '%s\n', fileOut{i});
                     end
@@ -101,7 +105,8 @@ try
                 
                 if ~strcmp(version, CeleSTVersion)
                     if ~flagDataBackedUp
-                        flagDataBackedUp = backupData;
+                        backupData(filenames.data);
+                        flagDataBackedUp = true;
                     end
                     fileOut = {['version ' CeleSTVersion]};
                     if isempty(version)
@@ -123,6 +128,7 @@ try
                     fclose(tmpSegFID);
                     
                     tmpSegFID = fopen(fullfile(filenames.segmentation,['wormSegm_',fileDB(measAndSegCheck).name,'.txt']), 'w');
+                    disp(['Updating: ' fullfile(filenames.segmentation,['wormSegm_',fileDB(measAndSegCheck).name,'.txt'])])
                     for i = 1:length(fileOut)
                         fprintf(tmpSegFID, '%s\n', fileOut{i});
                     end

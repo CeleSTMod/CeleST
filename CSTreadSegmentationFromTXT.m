@@ -66,6 +66,9 @@ if strcmp(line1{1}{1}, 'format') && strcmp(line2{1}{1}, 'block')
             listOfWorms.status{w} = fgetl(fid);
         end
         tline = fgetl(fid);
+        while strcmp(tline, 'valid') || strcmp(tline, 'reject')
+            tline = fgetl(fid);
+        end
     end
     while ischar(tline) && ~isempty(tline)
         % read the worm and frame indices
