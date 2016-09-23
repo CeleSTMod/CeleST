@@ -864,7 +864,7 @@ if fileToLog > 1; fclose(fileToLog); end
                     tmpNewVideo(1).date = get(tmpfield.date,'string');
                     tmpNewVideo(1).gene = get(tmpfield.gene,'string');
                     tmpNewVideo(1).age = str2double(get(tmpfield.age,'string'));
-                    tmpNewVideo(1).set = str2double(get(tmpfield.set,'string'));
+                    tmpNewVideo(1).set = get(tmpfield.set,'string');
                     tmpNewVideo(1).trial = str2double(get(tmpfield.trial,'string'));
                     tmpNewVideo(1).note = get(tmpfield.note,'string');
                     tmpNewVideo(1).author = get(tmpfield.author,'string');

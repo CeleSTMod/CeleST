@@ -871,7 +871,7 @@ waitfor(mainFigure,'BeingDeleted','on');
                 listBoolean = {'missed', 'lost', 'overlapped', 'valid', 'outOfLengths', 'outOfPrevious', 'inGlareZone', 'selfOverlap', 'manualInvalid', 'manualValid'};
                 listCell = {'skel', 'width', 'cblSubSampled'};
                 listCellSingle = {'localthreshold'};
-                listDouble = {'lengthWorms', 'positionCenterX', 'positionCenterY', 'widthCenter', 'overlapPrev', 'headThrashCount'};
+                listDouble = {'lengthWorms', 'positionCenterX', 'positionCenterY', 'widthCenter', 'overlapPrev'};
                 % Removed deprecated fields from listDouble: 'angleHead', 'angleTail', 'I', 'J', 'C', 'S', 'O'
                 
                 if worm2 < 0
