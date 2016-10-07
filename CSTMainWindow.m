@@ -191,7 +191,7 @@ colFtlWell = find(strcmp('well', filterNames));
 % ----------
 % List of videos
 % ----------
-editable = [true(1,12), false(1,6), true(1,5)];
+editable = [true(1,12), false(1,6), true(1,7)];
 tableVideos = uitable('parent',mainPanel,'position',[0 30 mainPanelPosition(3)-330 yFilters-30],'RearrangeableColumn','on','ColumnEditable',[],'CellEditCallback', @tableEdit,'ColumnWidth','auto');
 listVideosIdx = [];
 populateFilters
@@ -592,8 +592,6 @@ if fileToLog > 1; fclose(fileToLog); end
                     end
                     if ~isfield(fileDB(seq),'scaleFactor') || isempty(fileDB(seq).scaleFactor)
                         fileDB(seq).scaleFactor = 1;
-                    else
-                        fileDB(seq).scaleFactor = fileDB(seq).mm_per_pixel / 0.0201;
                     end
                 end
             end
